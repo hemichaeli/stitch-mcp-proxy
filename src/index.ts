@@ -121,7 +121,10 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       access_token: 'stitch-proxy-token',
       token_type: 'Bearer',
-      expires_in: 3600,
+      // Long-lived on purpose: the proxy is always-approve and real auth is the
+      // injected API key, so a short TTL only forces pointless hourly re-auth in
+      // MCP clients that don't silently refresh. 10 years.
+      expires_in: 315360000,
       refresh_token: 'stitch-proxy-refresh',
       scope: 'mcp',
     });
