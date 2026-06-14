@@ -153,6 +153,7 @@ const server = http.createServer(async (req, res) => {
       lower === 'upgrade' ||
       lower === 'proxy-authorization' ||
       lower === 'authorization' || // client bearer is irrelevant; key is injected
+      lower === 'accept-encoding' || // force identity upstream — we buffer+rewrite text, so we cannot relay compressed bodies
       lower === 'te' ||
       lower === 'trailers'
     ) continue;
@@ -161,6 +162,7 @@ const server = http.createServer(async (req, res) => {
 
   headers['host'] = STITCH_HOST;
   headers['x-goog-api-key'] = API_KEY;
+  headers['accept-encoding'] = 'identity'; // never let Stitch gzip: the text path decodes as utf8 and would corrupt a compressed body
 
   const options: https.RequestOptions = {
     hostname: STITCH_HOST,
@@ -194,6 +196,9 @@ const server = http.createServer(async (req, res) => {
       proxyRes.on('data', (chunk) => { body += chunk; });
       proxyRes.on('end', () => {
         const out = rewrite(body);
+        // We decoded the body as utf8 text, so any upstream content-encoding no longer applies.
+        delete baseHeaders['content-encoding'];
+        delete baseHeaders['Content-Encoding'];
         baseHeaders['content-length'] = Buffer.byteLength(out).toString();
         res.writeHead(proxyRes.statusCode || 502, baseHeaders);
         res.end(out);
